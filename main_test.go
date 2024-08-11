@@ -10,11 +10,15 @@ func TestWhiteSpace(t *testing.T) {
 }
 func TestNumber(t *testing.T) {
 	t.Run("number", func(t *testing.T) {
-		assert.Equal(t, " ", number("123.45 "))
+		i, num := number("123.45 ")
+		assert.Equal(t, " ", i)
+		assert.Equal(t, Number("123.45"), num)
 	})
 }
 func TestIdent(t *testing.T) {
 	t.Run("ident", func(t *testing.T) {
-		assert.Equal(t, "", ident("Adam"))
+		i, ident := ident("Adam")
+		assert.Equal(t, "", i)
+		assert.Equal(t, Ident("Adam"), ident)
 	})
 }
