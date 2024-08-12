@@ -2,13 +2,20 @@ package main
 
 import "fmt"
 
-type Token interface {
-	getValue() interface{}
-}
+type Token Valuer
 type Ident string
 type Number string
 type LParen string
 type RParen string
+
+type TokenTree struct {
+	Token Token
+	Tree  []TokenTree
+}
+
+type Valuer interface {
+	getValue() interface{}
+}
 
 func (i Ident) getValue() interface{}  { return i }
 func (n Number) getValue() interface{} { return n }
@@ -16,14 +23,21 @@ func (l LParen) getValue() interface{} { return l }
 func (r RParen) getValue() interface{} { return r }
 
 func main() {
-	input := "(123 456 world)"
-	fmt.Printf("source: %#v, parsed: %#v\n", input, source(input))
+	input := "Hello world"
+	str, sourced := source(input)
+	fmt.Printf("source: %#v, parsed: %#v, %#v\n", input, str, sourced)
+
+	input = "(123 456) world"
+	str, sourced = source(input)
+	fmt.Printf("source: %#v, parsed: %#v, %#v\n", input, str, sourced)
 
 	input = "((car cdr) cdr)"
-	fmt.Printf("source: %#v, parsed: %#v\n", input, source(input))
+	str, sourced = source(input)
+	fmt.Printf("source: %#v, parsed: %#v, %#v\n", input, str, sourced)
 
 	input = "()())))((()))"
-	fmt.Printf("source: %#v, parsed: %#v\n", input, source(input))
+	str, sourced = source(input)
+	fmt.Printf("source: %#v, parsed: %#v, %#v\n", input, str, sourced)
 }
 
 func whitespace(input string) string {
@@ -71,17 +85,23 @@ func token(input string) (string, Token) {
 	return input, nil
 }
 
-func source(input string) []Token {
-	var tokens []Token
-	var nextToken Token
-	for {
-		input, nextToken = token(input)
-		tokens = append(tokens, nextToken)
-		if input == "" {
-			break
+func source(input string) (string, TokenTree) {
+	var tokens []TokenTree
+	for len(input) > 0 {
+		nextInput, token := token(input)
+		input = nextInput
+		switch token.(type) {
+		case LParen:
+			var tt TokenTree
+			input, tt = source(input)
+			tokens = append(tokens, tt)
+		case RParen:
+			return input, TokenTree{Tree: tokens}
+		default:
+			tokens = append(tokens, TokenTree{Token: token})
 		}
 	}
-	return tokens
+	return input, TokenTree{Tree: tokens}
 }
 
 func lparen(input string) (string, Token) {
