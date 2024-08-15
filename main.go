@@ -136,27 +136,27 @@ func addTerm(input string) (string, Expression, error) {
 
 func add(input string) (string, Expression, error) {
 	var left, right Expression
-	var nextInput string
-	for {
-		nextInput, expr, err := addTerm(input)
-		if err != nil {
-			break
-		}
-		if left != nil {
-			newExpr := Add{left, expr}
-			left = (Expression)(newExpr)
-		} else {
-			left = expr
-		}
-		input = nextInput
-	}
+	//for {
+	//	nextInput, expr, err := addTerm(input)
+	//	if err != nil {
+	//		break
+	//	}
+	//	if left != nil {
+	//		newExpr := Add{left, expr}
+	//		left = (Expression)(newExpr)
+	//	} else {
+	//		left = expr
+	//	}
+	//	input = nextInput
+	//}
+	//
+	//if left == nil {
+	//	return input, nil, fmt.Errorf("failed to match pattern")
+	//}
 
-	if left == nil {
-		return input, nil, fmt.Errorf("failed to match pattern")
-	}
-
-	nextInput, right, err := expr(input)
-	if err != nil {
+	nextInput, left, err := addTerm(input)
+	nextInput, right, err2 := addTerm(nextInput)
+	if err == nil && err2 == nil {
 		return nextInput, Add{left, right}, err
 	}
 
