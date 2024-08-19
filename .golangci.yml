@@ -1,0 +1,11 @@
+---
+run:
+  # Include test files or not.
+  tests: false
+  allow-parallel-runners: true
+
+linters:
+  enable:
+    - gofmt
+    - govet
+    - goimports

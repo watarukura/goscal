@@ -42,16 +42,16 @@ func main() {
 }
 
 func eval(expr Expression) Number {
-	switch expr.(type) {
+	switch value := expr.(type) {
 	case Ident:
-		if expr == Ident("pi") {
-			return math.Pi
+		if value == "pi" {
+			return Number(math.Pi)
 		}
-		log.Fatalf("Unknown identifier '%v'", expr)
+		log.Fatalf("Unknown identifier '%v'", value)
 	case Number:
-		return expr.(Number)
+		return value
 	case Add:
-		return eval(expr.(Add).Left) + eval(expr.(Add).Right)
+		return eval(value.Left) + eval(value.Right)
 	}
 	return Number(0)
 }
