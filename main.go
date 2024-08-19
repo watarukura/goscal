@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 	"strconv"
 )
 
@@ -26,21 +27,33 @@ type Add struct {
 
 func main() {
 	testCases := []string{
-		//"123",
-		//"Hello + world",
-		//"(123 + 456 ) + world",
-		//"car + cdr + cdr",
-		//"((1 + 2) + (3 + 4)) + 5 + 6",
-		"1 + 2",
+		"pi",
+		"1",
+		"1 + 2 + 3",
+		"(123 + 456 ) + pi",
+		"10 + (100 + 1)",
+		"((1 + 2) + (3 + 4)) + 5 + 6",
 	}
 	for _, input := range testCases {
-		_, expr, err := expr(input)
-		if err != nil {
-			log.Fatalf("failed to parse expression '%s': %v", input, err)
-		} else {
-			fmt.Printf("source: %q, parsed: %#v\n", input, expr)
-		}
+		_, expr, _ := expr(input)
+		evaled := eval(expr)
+		fmt.Printf("source: %q, parsed: %#v\n", input, evaled)
 	}
+}
+
+func eval(expr Expression) Number {
+	switch expr.(type) {
+	case Ident:
+		if expr == Ident("pi") {
+			return math.Pi
+		}
+		log.Fatalf("Unknown identifier '%v'", expr)
+	case Number:
+		return expr.(Number)
+	case Add:
+		return eval(expr.(Add).Left) + eval(expr.(Add).Right)
+	}
+	return Number(0)
 }
 
 func whitespace(input string) string {
@@ -49,50 +62,37 @@ func whitespace(input string) string {
 	}
 	return input
 }
-func number(input string) (string, Expression, error) {
+func number(input string) (string, Expression, bool) {
 	if len(input) > 0 && (input[0] == '-' || input[0] == '+' || input[0] == '.' || ('0' <= input[0] && input[0] <= '9')) {
 		i := 0
 		for ; i < len(input) && (input[i] == '.' || ('0' <= input[i] && input[i] <= '9')); i++ {
 		}
 		num, _ := strconv.ParseFloat(input[:i], 64)
 		input = input[i:]
-		return input, Number(num), nil
+		return input, Number(num), true
 	}
-	return input, nil, fmt.Errorf("number: invalid input: %q", input)
+	return input, nil, false
 }
-func ident(input string) (string, Expression, error) {
+func ident(input string) (string, Expression, bool) {
 	if len(input) > 0 && (('a' <= input[0] && input[0] <= 'z') || ('A' <= input[0] && input[0] <= 'Z')) {
 		i := 0
 		for ; i < len(input) && (('a' <= input[i] && input[i] <= 'z') || ('A' <= input[i] && input[i] <= 'Z') || ('0' <= input[i] && input[i] <= '9')); i++ {
 		}
 		ident := input[:i]
 		input = input[i:]
-		return input, Ident(ident), nil
+		return input, Ident(ident), true
 	}
-	return input, nil, fmt.Errorf("ident: invalid input: %q", input)
+	return input, nil, false
 }
 
-func token(input string) (string, Expression, error) {
-	if input, ident, err := ident(whitespace(input)); err == nil {
-		return input, ident, nil
+func token(input string) (string, Expression, bool) {
+	if input, ident, ok := ident(whitespace(input)); ok {
+		return input, ident, true
 	}
-	if input, number, err := number(whitespace(input)); err == nil {
-		return input, number, nil
+	if input, number, ok := number(whitespace(input)); ok {
+		return input, number, true
 	}
-	return input, nil, fmt.Errorf("token: invalid input: %q", input)
-}
-
-func lparen(input string) string {
-	if len(input) > 0 && input[0] == '(' {
-		return input[1:]
-	}
-	return ""
-}
-func rparen(input string) string {
-	if len(input) > 0 && input[0] == ')' {
-		return input[1:]
-	}
-	return ""
+	return input, nil, false
 }
 
 func plus(input string) string {
@@ -104,73 +104,91 @@ func plus(input string) string {
 	return input
 }
 
-func expr(input string) (string, Expression, error) {
-	if res, expr, err := add(input); err == nil {
-		return res, expr, nil
+func expr(input string) (string, Expression, bool) {
+	if res, expr, ok := add(input); ok {
+		return res, expr, true
 	}
 
-	if res, expr, err := term(input); err == nil {
-		return res, expr, nil
+	if res, expr, ok := term(input); ok {
+		return res, expr, true
 	}
 
-	return "", nil, fmt.Errorf("failed to match pattern")
+	return "", nil, false
 }
 
-func paren(input string) (string, Expression, error) {
-	nextInput := lparen(whitespace(input))
-	if nextInput == "" {
-		return "", nil, fmt.Errorf("failed to match pattern")
-	}
-	nextInput, expr, err := expr(nextInput)
-	nextInput = rparen(whitespace(nextInput))
+func paren(input string) (string, Expression, bool) {
+	input = whitespace(input)
+	nextInput, ok := lparen(input)
 
-	return nextInput, expr, err
+	if ok {
+		nextInput, expr, ok := expr(nextInput)
+		nextInput, _ = rparen(whitespace(nextInput))
+		return nextInput, expr, ok
+	}
+
+	nextInput, ok = rparen(input)
+	if ok {
+		return nextInput, nil, true
+	}
+
+	return input, nil, false
+}
+func lparen(input string) (string, bool) {
+	if len(input) > 0 && input[0] == '(' {
+		return input[1:], true
+	}
+	return input, false
+}
+func rparen(input string) (string, bool) {
+	if len(input) > 0 && input[0] == ')' {
+		return input[1:], true
+	}
+	return input, false
 }
 
-func addTerm(input string) (string, Expression, error) {
-	nextInput, lhs, err := term(whitespace(input))
+func addTerm(input string) (string, Expression, bool) {
+	nextInput, lhs, ok := term(whitespace(input))
 	nextInput = plus(whitespace(nextInput))
-
-	return nextInput, lhs, err
+	if ok {
+		return nextInput, lhs, true
+	}
+	return input, nil, false
 }
 
-func add(input string) (string, Expression, error) {
-	var left, right Expression
-	//for {
-	//	nextInput, expr, err := addTerm(input)
-	//	if err != nil {
-	//		break
-	//	}
-	//	if left != nil {
-	//		newExpr := Add{left, expr}
-	//		left = (Expression)(newExpr)
-	//	} else {
-	//		left = expr
-	//	}
-	//	input = nextInput
-	//}
-	//
-	//if left == nil {
-	//	return input, nil, fmt.Errorf("failed to match pattern")
-	//}
-
-	nextInput, left, err := addTerm(input)
-	nextInput, right, err2 := addTerm(nextInput)
-	if err == nil && err2 == nil {
-		return nextInput, Add{left, right}, err
+func add(input string) (string, Expression, bool) {
+	var add Expression
+	var nextInput string
+	for {
+		nextInput, expr, ok := addTerm(input)
+		if !ok {
+			break
+		}
+		if expr == nil {
+			input = nextInput
+			continue
+		}
+		if add != nil {
+			add = Add{add, expr}
+		} else {
+			add = expr
+		}
+		input = nextInput
 	}
 
-	return nextInput, nil, fmt.Errorf("failed to match pattern")
+	if add == nil {
+		return nextInput, nil, false
+	}
+	return nextInput, add, true
 }
 
-func term(input string) (string, Expression, error) {
-	if res, expr, err := paren(input); err == nil {
-		return res, expr, nil
+func term(input string) (string, Expression, bool) {
+	if res, expr, ok := paren(input); ok {
+		return res, expr, true
 	}
 
-	if res, expr, err := token(input); err == nil {
-		return res, expr, nil
+	if res, expr, ok := token(input); ok {
+		return res, expr, true
 	}
 
-	return "", nil, fmt.Errorf("failed to match pattern")
+	return "", nil, false
 }
