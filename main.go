@@ -1,194 +1,337 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math"
 	"strconv"
+	"strings"
+
+	. "github.com/shellyln/takenoco/base"
+	"github.com/shellyln/takenoco/extra"
+	objparser "github.com/shellyln/takenoco/object"
+	. "github.com/shellyln/takenoco/string"
 )
 
-type Expression Valuer
-type Ident string
-type Number float64
-type Valuer interface {
-	getValue() interface{}
+var rootParser ParserFn
+
+func init() {
+	rootParser = program()
 }
 
-func (i Ident) getValue() interface{}  { return i }
-func (n Number) getValue() interface{} { return n }
+// Remove the resulting AST.
+func erase(fn ParserFn) ParserFn {
+	return Trans(fn, Erase)
+}
 
-// func (l LParen) getValue() interface{} { return l }
-// func (r RParen) getValue() interface{} { return r }
-func (a Add) getValue() interface{} { return a }
+// Whitespaces
+func sp0() ParserFn {
+	return erase(ZeroOrMoreTimes(Whitespace()))
+}
 
-type Add struct {
-	Left, Right Expression
+func number() ParserFn {
+	return Trans(
+		FlatGroup(
+			First(
+				SeqI("pi"),
+				extra.FloatNumberStr(),
+				extra.IntegerNumberStr(),
+			),
+			WordBoundary(),
+			erase(sp0()),
+		),
+		func(ctx ParserContext, asts AstSlice) (AstSlice, error) {
+			var v float64
+			if strings.ToLower(asts[0].Value.(string)) == "pi" {
+				v = math.Pi
+				asts = AstSlice{{
+					Type:      AstType_Float,
+					ClassName: "Number",
+					Value:     v,
+				}}
+			} else {
+				v, err := strconv.ParseFloat(asts[0].Value.(string), 64)
+				if err != nil {
+					return nil, err
+				}
+				asts = AstSlice{{
+					Type:      AstType_Float,
+					ClassName: "Number",
+					Value:     v,
+				}}
+			}
+			return asts, nil
+		},
+	)
+}
+
+// Unary operators
+func unaryOperator() ParserFn {
+	return Trans(
+		FlatGroup(
+			CharClass("-"),
+			erase(sp0()),
+		),
+		ChangeClassName("UnaryOperator"),
+	)
+}
+
+// Binary operators
+func binaryOperator() ParserFn {
+	return Trans(
+		FlatGroup(
+			CharClass("+", "-", "*", "/"),
+			erase(sp0()),
+		),
+		ChangeClassName("BinaryOperator"),
+	)
+}
+
+// Expression without parentheses
+func simpleExpression() ParserFn {
+	return FlatGroup(
+		number(),
+		ZeroOrMoreTimes(
+			binaryOperator(),
+			number(),
+		),
+	)
+}
+
+// Expression enclosed in parentheses
+func groupedExpression() ParserFn {
+	return FlatGroup(
+		erase(CharClass("(")),
+		First(
+			FlatGroup(
+				erase(sp0()),
+				expression(),
+				erase(CharClass(")")),
+				erase(sp0()),
+			),
+			Error("Error in grouped expression"),
+		),
+	)
+}
+
+// Expression before applying production rules
+func expressionInner() ParserFn {
+	return FlatGroup(
+		ZeroOrMoreTimes(unaryOperator()),
+		First(
+			simpleExpression(),
+			Indirect(groupedExpression),
+			Error("Value required"),
+		),
+		ZeroOrMoreTimes(
+			binaryOperator(),
+			First(
+				FlatGroup(
+					ZeroOrMoreTimes(unaryOperator()),
+					First(
+						simpleExpression(),
+						Indirect(groupedExpression),
+					),
+				),
+				Error("Error in the expression after the binary operator"),
+			),
+		),
+	)
+}
+
+// Single expression
+func expression() ParserFn {
+	return Trans(
+		expressionInner(),
+		formulaProductionRules(),
+	)
+}
+
+// Entire program
+func program() ParserFn {
+	return FlatGroup(
+		Start(),
+		erase(sp0()),
+		expression(),
+		End(),
+	)
+}
+
+func Parse(s string) (float64, error) {
+	out, err := rootParser(*NewStringParserContext(s))
+	if err != nil {
+		pos := GetLineAndColPosition(s, out.SourcePosition, 4)
+		return 0, errors.New(
+			err.Error() +
+				"\n --> Line " + strconv.Itoa(pos.Line) +
+				", Col " + strconv.Itoa(pos.Col) + "\n" +
+				pos.ErrSource)
+	}
+
+	if out.MatchStatus == MatchStatus_Matched {
+		return out.AstStack[0].Value.(float64), nil
+	} else {
+		pos := GetLineAndColPosition(s, out.SourcePosition, 4)
+		return 0, errors.New(
+			"Parse failed" +
+				"\n --> Line " + strconv.Itoa(pos.Line) +
+				", Col " + strconv.Itoa(pos.Col) + "\n" +
+				pos.ErrSource + "\n" + out.MatchStatus.String())
+	}
+}
+
+// Production rule (Precedence = 3)
+var expressionRuleUnaryOp = Precedence{
+	Rules: []ParserFn{
+		Trans(
+			FlatGroup(
+				isOperator("UnaryOperator", []string{"-"}),
+				anyOperand(),
+			),
+			func(ctx ParserContext, asts AstSlice) (AstSlice, error) {
+				opcode := asts[0].Value.(string)
+				op1 := asts[1].Value.(float64)
+
+				var v float64
+				switch opcode {
+				case "-":
+					v = -op1
+				}
+
+				return AstSlice{{
+					ClassName: "Number",
+					Value:     v,
+				}}, nil
+			},
+		),
+	},
+	Rtol: true,
+}
+
+// Production rule (Precedence = 2)
+var expressionRuleMulDiv = Precedence{
+	Rules: []ParserFn{
+		Trans(
+			FlatGroup(
+				anyOperand(),
+				isOperator("BinaryOperator", []string{"*", "/"}),
+				anyOperand(),
+			),
+			func(ctx ParserContext, asts AstSlice) (AstSlice, error) {
+				opcode := asts[1].Value.(string)
+				op1 := asts[0].Value.(float64)
+				op2 := asts[2].Value.(float64)
+
+				var v float64
+				switch opcode {
+				case "*":
+					v = op1 * op2
+				case "/":
+					v = op1 / op2
+				}
+
+				return AstSlice{{
+					ClassName: "Number",
+					Value:     v,
+				}}, nil
+			},
+		),
+	},
+}
+
+// Production rule (Precedence = 1)
+var expressionRulePlusMinus = Precedence{
+	Rules: []ParserFn{
+		Trans(
+			FlatGroup(
+				anyOperand(),
+				isOperator("BinaryOperator", []string{"+", "-"}),
+				anyOperand(),
+			),
+			func(ctx ParserContext, asts AstSlice) (AstSlice, error) {
+				opcode := asts[1].Value.(string)
+				op1 := asts[0].Value.(float64)
+				op2 := asts[2].Value.(float64)
+
+				var v float64
+				switch opcode {
+				case "+":
+					v = op1 + op2
+				case "-":
+					v = op1 - op2
+				}
+
+				return AstSlice{{
+					ClassName: "Number",
+					Value:     v,
+				}}, nil
+			},
+		),
+	},
+}
+
+// Production rules
+var precedences = []Precedence{
+	expressionRuleUnaryOp,
+	expressionRuleMulDiv,
+	expressionRulePlusMinus,
+}
+
+// Production rules
+func formulaProductionRules() TransformerFn {
+	return ProductionRule(
+		precedences,
+		FlatGroup(Start(), objparser.Any(), objparser.End()),
+	)
+}
+
+func unwrapOperandItem(ctx ParserContext, asts AstSlice) (AstSlice, error) {
+	return AstSlice{asts[0].Value.(Ast)}, nil
+}
+
+func makeOpMatcher(className string, ops []string) func(c interface{}) bool {
+	return func(c interface{}) bool {
+		ast, ok := c.(Ast)
+		if !ok || ast.ClassName != className {
+			return false
+		}
+		val := ast.Value.(string)
+		for _, op := range ops {
+			if op == val {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// An assertion that matches all single tokens
+func anyOperand() ParserFn {
+	return Trans(objparser.Any(), unwrapOperandItem)
+}
+
+// An assertion matching a single token that matches the class name
+func isOperator(className string, ops []string) ParserFn {
+	return Trans(objparser.ObjClassFn(makeOpMatcher(className, ops)), unwrapOperandItem)
 }
 
 func main() {
 	testCases := []string{
 		"pi",
-		"1",
-		"1 + 2 + 3",
+		//"1",
+		//"1 + 2 + 3",
 		"(123 + 456 ) + pi",
-		"10 + (100 + 1)",
-		"((1 + 2) + (3 + 4)) + 5 + 6",
+		//"10 + (100 + 1)",
+		//"((1 + 2) + (3 + 4)) + 5 + 6",
+		"6.6",
+		"((1.1 + 2.2) + (3.3 + 4.4 )) + 5.5 + 6.6",
 	}
 	for _, input := range testCases {
-		_, expr, _ := expr(input)
-		evaled := eval(expr)
-		fmt.Printf("source: %q, parsed: %#v\n", input, evaled)
-	}
-}
-
-func eval(expr Expression) Number {
-	switch value := expr.(type) {
-	case Ident:
-		if value == "pi" {
-			return Number(math.Pi)
+		data, err := Parse(input)
+		if err != nil {
+			log.Fatal(err)
 		}
-		log.Fatalf("Unknown identifier '%v'", value)
-	case Number:
-		return value
-	case Add:
-		return eval(value.Left) + eval(value.Right)
+		fmt.Printf("input: %v, result: %v\n", input, data)
 	}
-	return Number(0)
-}
-
-func whitespace(input string) string {
-	for len(input) > 0 && input[0] == ' ' {
-		input = input[1:]
-	}
-	return input
-}
-func number(input string) (string, Expression, bool) {
-	if len(input) > 0 && (input[0] == '-' || input[0] == '+' || input[0] == '.' || ('0' <= input[0] && input[0] <= '9')) {
-		i := 0
-		for ; i < len(input) && (input[i] == '.' || ('0' <= input[i] && input[i] <= '9')); i++ {
-		}
-		num, _ := strconv.ParseFloat(input[:i], 64)
-		input = input[i:]
-		return input, Number(num), true
-	}
-	return input, nil, false
-}
-func ident(input string) (string, Expression, bool) {
-	if len(input) > 0 && (('a' <= input[0] && input[0] <= 'z') || ('A' <= input[0] && input[0] <= 'Z')) {
-		i := 0
-		for ; i < len(input) && (('a' <= input[i] && input[i] <= 'z') || ('A' <= input[i] && input[i] <= 'Z') || ('0' <= input[i] && input[i] <= '9')); i++ {
-		}
-		ident := input[:i]
-		input = input[i:]
-		return input, Ident(ident), true
-	}
-	return input, nil, false
-}
-
-func token(input string) (string, Expression, bool) {
-	if input, ident, ok := ident(whitespace(input)); ok {
-		return input, ident, true
-	}
-	if input, number, ok := number(whitespace(input)); ok {
-		return input, number, true
-	}
-	return input, nil, false
-}
-
-func plus(input string) string {
-	if len(input) > 0 && input[0] == '+' {
-		if len(input) > 1 {
-			return input[1:]
-		}
-	}
-	return input
-}
-
-func expr(input string) (string, Expression, bool) {
-	if res, expr, ok := add(input); ok {
-		return res, expr, true
-	}
-
-	if res, expr, ok := term(input); ok {
-		return res, expr, true
-	}
-
-	return "", nil, false
-}
-
-func paren(input string) (string, Expression, bool) {
-	input = whitespace(input)
-	nextInput, ok := lparen(input)
-
-	if ok {
-		nextInput, expr, ok := expr(nextInput)
-		nextInput, _ = rparen(whitespace(nextInput))
-		return nextInput, expr, ok
-	}
-
-	nextInput, ok = rparen(input)
-	if ok {
-		return nextInput, nil, true
-	}
-
-	return input, nil, false
-}
-func lparen(input string) (string, bool) {
-	if len(input) > 0 && input[0] == '(' {
-		return input[1:], true
-	}
-	return input, false
-}
-func rparen(input string) (string, bool) {
-	if len(input) > 0 && input[0] == ')' {
-		return input[1:], true
-	}
-	return input, false
-}
-
-func addTerm(input string) (string, Expression, bool) {
-	nextInput, lhs, ok := term(whitespace(input))
-	nextInput = plus(whitespace(nextInput))
-	if ok {
-		return nextInput, lhs, true
-	}
-	return input, nil, false
-}
-
-func add(input string) (string, Expression, bool) {
-	var add Expression
-	var nextInput string
-	for {
-		nextInput, expr, ok := addTerm(input)
-		if !ok {
-			break
-		}
-		if expr == nil {
-			input = nextInput
-			continue
-		}
-		if add != nil {
-			add = Add{add, expr}
-		} else {
-			add = expr
-		}
-		input = nextInput
-	}
-
-	if add == nil {
-		return nextInput, nil, false
-	}
-	return nextInput, add, true
-}
-
-func term(input string) (string, Expression, bool) {
-	if res, expr, ok := paren(input); ok {
-		return res, expr, true
-	}
-
-	if res, expr, ok := token(input); ok {
-		return res, expr, true
-	}
-
-	return "", nil, false
 }
