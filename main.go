@@ -3,12 +3,15 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
+	"math"
+	"strconv"
+	"strings"
+
 	. "github.com/shellyln/takenoco/base"
 	"github.com/shellyln/takenoco/extra"
 	objparser "github.com/shellyln/takenoco/object"
 	. "github.com/shellyln/takenoco/string"
-	"log"
-	"strconv"
 )
 
 var rootParser ParserFn
@@ -31,6 +34,7 @@ func number() ParserFn {
 	return Trans(
 		FlatGroup(
 			First(
+				SeqI("pi"),
 				extra.FloatNumberStr(),
 				extra.IntegerNumberStr(),
 			),
@@ -38,15 +42,25 @@ func number() ParserFn {
 			erase(sp0()),
 		),
 		func(ctx ParserContext, asts AstSlice) (AstSlice, error) {
-			v, err := strconv.ParseFloat(asts[0].Value.(string), 64)
-			if err != nil {
-				return nil, err
+			var v float64
+			if strings.ToLower(asts[0].Value.(string)) == "pi" {
+				v = math.Pi
+				asts = AstSlice{{
+					Type:      AstType_Float,
+					ClassName: "Number",
+					Value:     v,
+				}}
+			} else {
+				v, err := strconv.ParseFloat(asts[0].Value.(string), 64)
+				if err != nil {
+					return nil, err
+				}
+				asts = AstSlice{{
+					Type:      AstType_Float,
+					ClassName: "Number",
+					Value:     v,
+				}}
 			}
-			asts = AstSlice{{
-				Type:      AstType_Float,
-				ClassName: "Number",
-				Value:     v,
-			}}
 			return asts, nil
 		},
 	)
@@ -167,33 +181,6 @@ func Parse(s string) (float64, error) {
 	}
 }
 
-var expressionRulePi = Precedence{
-	Rules: []ParserFn{
-		Trans(
-			FlatGroup(
-				isOperator("UnaryOperator", []string{"-"}),
-				anyOperand(),
-			),
-			func(ctx ParserContext, asts AstSlice) (AstSlice, error) {
-				opcode := asts[0].Value.(string)
-				op1 := asts[1].Value.(float64)
-
-				var v float64
-				switch opcode {
-				case "-":
-					v = -op1
-				}
-
-				return AstSlice{{
-					ClassName: "Number",
-					Value:     v,
-				}}, nil
-			},
-		),
-	},
-	Rtol: true,
-}
-
 // Production rule (Precedence = 3)
 var expressionRuleUnaryOp = Precedence{
 	Rules: []ParserFn{
@@ -286,7 +273,6 @@ var expressionRulePlusMinus = Precedence{
 
 // Production rules
 var precedences = []Precedence{
-	expressionRulePi,
 	expressionRuleUnaryOp,
 	expressionRuleMulDiv,
 	expressionRulePlusMinus,
@@ -332,10 +318,10 @@ func isOperator(className string, ops []string) ParserFn {
 
 func main() {
 	testCases := []string{
-		//"pi",
+		"pi",
 		//"1",
 		//"1 + 2 + 3",
-		//"(123 + 456 ) + pi",
+		"(123 + 456 ) + pi",
 		//"10 + (100 + 1)",
 		//"((1 + 2) + (3 + 4)) + 5 + 6",
 		"6.6",
