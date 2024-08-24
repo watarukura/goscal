@@ -71,6 +71,17 @@ func symbol() ParserFn {
 		FlatGroup(
 			First(
 				SeqI("sqrt"),
+				SeqI("sin"),
+				SeqI("cos"),
+				SeqI("tan"),
+				SeqI("asin"),
+				SeqI("acos"),
+				SeqI("atan"),
+				SeqI("atan2"),
+				SeqI("pow"),
+				SeqI("exp"),
+				SeqI("log10"),
+				SeqI("log"),
 			),
 			erase(CharClass("(")),
 			erase(sp0()),
@@ -84,6 +95,28 @@ func symbol() ParserFn {
 			switch asts[0].Value {
 			case "sqrt":
 				result = math.Sqrt(v)
+			case "sin":
+				result = math.Sin(v)
+			case "cos":
+				result = math.Cos(v)
+			case "tan":
+				result = math.Tan(v)
+			case "asin":
+				result = math.Asin(v)
+			case "acos":
+				result = math.Acos(v)
+			case "atan":
+				result = math.Atan(v)
+			case "atan2":
+				result = math.Atan2(v, v)
+			case "pow":
+				result = math.Pow(v, v)
+			case "exp":
+				result = math.Exp(v)
+			case "log":
+				result = math.Log(v)
+			case "log10":
+				result = math.Log10(v)
 			}
 
 			asts = AstSlice{{
@@ -365,6 +398,17 @@ func main() {
 		//"6.6",
 		//"((1.1 + 2.2) + (3.3 + 4.4 )) + 5.5 + 6.6",
 		"sqrt(100)",
+		//"sin(pi / 4)",
+		"cos(100)",
+		"tan(100)",
+		"asin(100)",
+		"acos(100)",
+		"atan(100)",
+		//"atan2(1)",
+		"pow(10)",
+		"exp(100)",
+		"log(100)",
+		"log10(100)",
 	}
 	for _, input := range testCases {
 		data, err := Parse(input)
