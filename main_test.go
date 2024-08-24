@@ -18,6 +18,9 @@ func TestParse(t *testing.T) {
 		{name: "valid unary op", arg: "-100", want: -100},
 		{name: "valid pi", arg: "pi", want: 3.141592653589793},
 		{name: "valid add pi", arg: "(123 + 456 ) + pi", want: 582.1415926535898},
+		{name: "valid mul", arg: "100 * -10", want: -1000},
+		{name: "valid paren div", arg: "(100 + 10) / 10", want: 11},
+		{name: "valid sqrt", arg: "sqrt(100)", want: 10},
 	}
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
