@@ -66,6 +66,36 @@ func number() ParserFn {
 	)
 }
 
+func symbol() ParserFn {
+	return Trans(
+		FlatGroup(
+			First(
+				SeqI("sqrt"),
+			),
+			erase(CharClass("(")),
+			erase(sp0()),
+			number(),
+			erase(sp0()),
+			erase(CharClass(")")),
+		),
+		func(ctx ParserContext, asts AstSlice) (AstSlice, error) {
+			v := asts[1].Value.(float64)
+			var result float64
+			switch asts[0].Value {
+			case "sqrt":
+				result = math.Sqrt(v)
+			}
+
+			asts = AstSlice{{
+				Type:      AstType_Float,
+				ClassName: "Number",
+				Value:     result,
+			}}
+			return asts, nil
+		},
+	)
+}
+
 // Unary operators
 func unaryOperator() ParserFn {
 	return Trans(
@@ -99,6 +129,13 @@ func simpleExpression() ParserFn {
 	)
 }
 
+// Expression without parentheses
+func functionExpression() ParserFn {
+	return FlatGroup(
+		symbol(),
+	)
+}
+
 // Expression enclosed in parentheses
 func groupedExpression() ParserFn {
 	return FlatGroup(
@@ -120,6 +157,7 @@ func expressionInner() ParserFn {
 	return FlatGroup(
 		ZeroOrMoreTimes(unaryOperator()),
 		First(
+			functionExpression(),
 			simpleExpression(),
 			Indirect(groupedExpression),
 			Error("Value required"),
@@ -318,14 +356,15 @@ func isOperator(className string, ops []string) ParserFn {
 
 func main() {
 	testCases := []string{
-		"pi",
+		//"pi",
 		//"1",
 		//"1 + 2 + 3",
-		"(123 + 456 ) + pi",
+		//"(123 + 456 ) + pi",
 		//"10 + (100 + 1)",
 		//"((1 + 2) + (3 + 4)) + 5 + 6",
-		"6.6",
-		"((1.1 + 2.2) + (3.3 + 4.4 )) + 5.5 + 6.6",
+		//"6.6",
+		//"((1.1 + 2.2) + (3.3 + 4.4 )) + 5.5 + 6.6",
+		"sqrt(100)",
 	}
 	for _, input := range testCases {
 		data, err := Parse(input)
