@@ -22,6 +22,7 @@ func TestParse(t *testing.T) {
 		{name: "valid paren div", arg: "(100 + 10) / 10", want: 11},
 		{name: "valid sqrt", arg: "sqrt(100)", want: 10},
 		{name: "valid pow", arg: "pow(3, 2)", want: 9},
+		{name: "valid pow + pow", arg: "pow(3, 2) + pow(3, 2)", want: 18},
 	}
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
