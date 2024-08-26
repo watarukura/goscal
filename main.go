@@ -76,8 +76,8 @@ func symbol() ParserFn {
 				SeqI("tan"),
 				SeqI("asin"),
 				SeqI("acos"),
-				SeqI("atan"),
 				SeqI("atan2"),
+				SeqI("atan"),
 				SeqI("pow"),
 				SeqI("exp"),
 				SeqI("log10"),
@@ -87,6 +87,11 @@ func symbol() ParserFn {
 			erase(sp0()),
 			number(),
 			erase(sp0()),
+			ZeroOrMoreTimes(
+				erase(CharClass(",")),
+				erase(sp0()),
+				number(),
+			),
 			erase(CharClass(")")),
 		),
 		func(ctx ParserContext, asts AstSlice) (AstSlice, error) {
@@ -108,9 +113,11 @@ func symbol() ParserFn {
 			case "atan":
 				result = math.Atan(v)
 			case "atan2":
-				result = math.Atan2(v, v)
+				v2 := asts[2].Value.(float64)
+				result = math.Atan2(v, v2)
 			case "pow":
-				result = math.Pow(v, v)
+				v2 := asts[2].Value.(float64)
+				result = math.Pow(v, v2)
 			case "exp":
 				result = math.Exp(v)
 			case "log":
@@ -389,14 +396,14 @@ func isOperator(className string, ops []string) ParserFn {
 
 func main() {
 	testCases := []string{
-		//"pi",
-		//"1",
-		//"1 + 2 + 3",
-		//"(123 + 456 ) + pi",
-		//"10 + (100 + 1)",
-		//"((1 + 2) + (3 + 4)) + 5 + 6",
-		//"6.6",
-		//"((1.1 + 2.2) + (3.3 + 4.4 )) + 5.5 + 6.6",
+		"pi",
+		"1",
+		"1 + 2 + 3",
+		"(123 + 456 ) + pi",
+		"10 + (100 + 1)",
+		"((1 + 2) + (3 + 4)) + 5 + 6",
+		"6.6",
+		"((1.1 + 2.2) + (3.3 + 4.4 )) + 5.5 + 6.6",
 		"sqrt(100)",
 		//"sin(pi / 4)",
 		"cos(100)",
@@ -404,8 +411,8 @@ func main() {
 		"asin(100)",
 		"acos(100)",
 		"atan(100)",
-		//"atan2(1)",
-		"pow(10)",
+		"atan2(1, 1)",
+		"pow(10, 2)",
 		"exp(100)",
 		"log(100)",
 		"log10(100)",
