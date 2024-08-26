@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 
@@ -172,7 +175,9 @@ func simpleExpression() ParserFn {
 // Expression without parentheses
 func functionExpression() ParserFn {
 	return FlatGroup(
+		erase(sp0()),
 		symbol(),
+		erase(sp0()),
 	)
 }
 
@@ -208,6 +213,7 @@ func expressionInner() ParserFn {
 				FlatGroup(
 					ZeroOrMoreTimes(unaryOperator()),
 					First(
+						functionExpression(),
 						simpleExpression(),
 						Indirect(groupedExpression),
 					),
@@ -395,33 +401,26 @@ func isOperator(className string, ops []string) ParserFn {
 }
 
 func main() {
-	testCases := []string{
-		"pi",
-		"1",
-		"1 + 2 + 3",
-		"(123 + 456 ) + pi",
-		"10 + (100 + 1)",
-		"((1 + 2) + (3 + 4)) + 5 + 6",
-		"6.6",
-		"((1.1 + 2.2) + (3.3 + 4.4 )) + 5.5 + 6.6",
-		"sqrt(100)",
-		//"sin(pi / 4)",
-		"cos(100)",
-		"tan(100)",
-		"asin(100)",
-		"acos(100)",
-		"atan(100)",
-		"atan2(1, 1)",
-		"pow(10, 2)",
-		"exp(100)",
-		"log(100)",
-		"log10(100)",
-	}
-	for _, input := range testCases {
-		data, err := Parse(input)
+	var reader io.Reader
+	if len(os.Args) > 1 {
+		file, err := os.Open(os.Args[1])
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Error opening file: %v", err)
 		}
-		fmt.Printf("input: %v, result: %v\n", input, data)
+		defer file.Close()
+		reader = file
+	} else {
+		reader = os.Stdin
 	}
+	sc := bufio.NewScanner(reader)
+	var input string
+	for sc.Scan() {
+		input += sc.Text()
+	}
+
+	data, err := Parse(input)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("input: %v, result: %v\n", input, data)
 }
