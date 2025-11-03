@@ -21,7 +21,7 @@ jobs:
         timeout-minutes: 5
         with:
           aqua_version: v2.55.1
-        uses: aquaproj/aqua-installer@ea518c135a02fc11ff8024364510c181a5c6b342 # v4.0.3
+        uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       - name: go test
         timeout-minutes: 6
         run: go test ./...
@@ -37,7 +37,7 @@ jobs:
         timeout-minutes: 5
         with:
           aqua_version: v2.55.1
-        uses: aquaproj/aqua-installer@ea518c135a02fc11ff8024364510c181a5c6b342 # v4.0.3
+        uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       - name: golangci-lint
         timeout-minutes: 6
         run: golangci-lint run
@@ -53,7 +53,7 @@ jobs:
         timeout-minutes: 5
         with:
           aqua_version: v2.55.1
-        uses: aquaproj/aqua-installer@ea518c135a02fc11ff8024364510c181a5c6b342 # v4.0.3
+        uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       - name: typos
         timeout-minutes: 6
         run: typos .
@@ -69,7 +69,7 @@ jobs:
         timeout-minutes: 5
         with:
           aqua_version: v2.55.1
-        uses: aquaproj/aqua-installer@ea518c135a02fc11ff8024364510c181a5c6b342 # v4.0.3
+        uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       - name: typos
         timeout-minutes: 6
         run: actionlint
