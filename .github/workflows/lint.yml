@@ -20,7 +20,7 @@ jobs:
       - name: Setup aqua
         timeout-minutes: 5
         with:
-          aqua_version: v2.56.2
+          aqua_version: v2.56.3
         uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       - name: go test
         timeout-minutes: 6
@@ -36,7 +36,7 @@ jobs:
       - name: Setup aqua
         timeout-minutes: 5
         with:
-          aqua_version: v2.56.2
+          aqua_version: v2.56.3
         uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       - name: golangci-lint
         timeout-minutes: 6
@@ -52,7 +52,7 @@ jobs:
       - name: Setup aqua
         timeout-minutes: 5
         with:
-          aqua_version: v2.56.2
+          aqua_version: v2.56.3
         uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       - name: typos
         timeout-minutes: 6
@@ -68,7 +68,7 @@ jobs:
       - name: Setup aqua
         timeout-minutes: 5
         with:
-          aqua_version: v2.56.2
+          aqua_version: v2.56.3
         uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
       - name: typos
         timeout-minutes: 6
