@@ -4,7 +4,7 @@ go 1.22.6
 
 require (
 	github.com/shellyln/takenoco v0.0.13
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.1
 )
 
 require (
